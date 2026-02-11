@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "lex.h"
+#include "compiler.h"
 
 
 static void replit(void) {
@@ -13,7 +14,7 @@ static void replit(void) {
             printf("\n");
             break;
         }
-        init_lexer(&lexer, line);
+        lexer_init(&lexer, line);
         scan_token(&lexer);
         printf("we are done!\n");
     }

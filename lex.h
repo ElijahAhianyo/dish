@@ -4,7 +4,7 @@ typedef enum {
     TOKEN_EOF, 
     TOKEN_PIPE, TOKEN_REDIRECT_IN, TOKEN_REDIRECT_OUT, TOKEN_MINUS,
     TOKEN_STAR, TOKEN_SLASH, TOKEN_LESS, TOKEN_LESS_LESS, TOKEN_GREAT, TOKEN_GREAT_GREAT,
-    TOKEN_GREATAMPERSAND, TOKEN_AMPERSAND,
+    TOKEN_GREATAMPERSAND, TOKEN_AMPERSAND, TOKEN_2_GREAT,
 
     // commands
     TOKEN_COMMAND_LS,TOKEN_COMMAND_EXIT,TOKEN_COMMAND_HELP, 
@@ -13,7 +13,7 @@ typedef enum {
 
     // TOKEN_NEWLINE,
     TOKEN_ERROR,
-    TOKEN_UNKNOWN
+    TOKEN_WORD
 } token_type_t;
 
 
@@ -29,5 +29,21 @@ typedef struct {
     const char *current;
 } lexer_t;
 
-void init_lexer(lexer_t *lexer, char *src);
+typedef struct {
+    token_t *data;
+    size_t len;
+    size_t cap;
+} token_array_t;
+
+void lexer_init(lexer_t *lexer, char *src);
+void lexer_free(lexer_t *lexer);
+
+void token_array_init(token_array_t *token_array);
+void token_array_push(token_array_t *token_array, token_t token);
+void token_array_free(token_array_t *token_array);
+
 token_t scan_token(lexer_t *lexer);
+void lex_all(lexer_t *lexer, token_array_t *token_array);
+
+char *tokentostr(token_t *t);
+
