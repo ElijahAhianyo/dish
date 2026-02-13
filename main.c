@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "lex.h"
 #include "compiler.h"
+#include "executer.h"
 
 
 static void replit(void) {
@@ -9,14 +10,20 @@ static void replit(void) {
     
 
     for (;;) {
+        command_t command;
+        command_init(&command);
+
         printf("> ");
         if(!fgets(line, sizeof(line) , stdin)){
             printf("\n");
             break;
         }
-        lexer_init(&lexer, line);
-        scan_token(&lexer);
+        compile(line, &command);
+        execute(&command);
         printf("we are done!\n");
+        clean:
+            free(line);
+            command_free(&command);
     }
 }
 

@@ -29,6 +29,16 @@ static token_t consume(parser_t *parser, token_type_t tt){
 }
 
 
+bool parser_match(parser_t *parser, token_type_t *tts, size_t len){
+    token_t curr = parser_peek(parser);
+    for(int i; i < len; i++){
+        if (tts[i] == curr.type){
+            return true;
+        } 
+    }
+    return false;
+}
+
 void parser_init(parser_t *parser, token_t *tokens){
     parser->current = 0;
     parser->start = 0;
@@ -39,87 +49,104 @@ void parser_free(parser_t *parser){
 
 }
 
-typedef struct {
-    token_t *in_file;
-    token_t *out_file;
-    token_t *err_file
-} std_args_t;
 
-void std_args_init(std_args_t *std_args){
-    std_args->err_file = NULL;
-    std_args->in_file = NULL;
-    std_args->out_file = NULL;
-}
-
-void marshall_simple_command(simple_command_t *sc, std_args_t *sa){
+char *parser_command_name(parser_t *parser){
+    token_type_t tts[] = {TOKEN_WORD};
     
+    if (parser_match(parser, tts, 1)){
+        //TODO: proper error handling here and other areas.
+        token_t tok = consume(parser, TOKEN_WORD);
+
+        return tokentostr(&tok);
+    }
+    return NULL;
+};
+char *parser_in_file(parser_t *parser){
+    token_type_t tts[] = {TOKEN_LESS};
+
+    if (parser_match(parser, tts, 1)){
+        parser_advance(parser);
+        token_t tok = consume(parser, TOKEN_WORD);
+        return tokentostr(&tok);
+    }
+    return NULL;
+};
+
+char *parser_outfile(parser_t *parser) {
+    token_type_t tts[] = {TOKEN_GREAT};
+
+    if (parser_match(parser, tts, 1)){
+        parser_advance(parser);
+        token_t tok = consume(parser, TOKEN_WORD);
+        return tokentostr(&tok);
+    }
+    return NULL;
+};
+char *parser_err_file(parser_t *parser){
+    token_type_t tts[] = {TOKEN_2_GREAT};
+
+    if (parser_match(parser, tts, 1)){
+        parser_advance(parser);
+        token_t tok = consume(parser, TOKEN_WORD);
+        return tokentostr(&tok);
+    }
+    return NULL;
 }
 
-void parser_parse(parser_t *parser, command_t *command){
-    while(!is_at_end(parser)){
-        simple_command_t sc;
-        simple_command_init(&sc);
-        std_args_t std_args;
-        std_args_init(&std_args);
-        
-        token_t curr = parser_advance(parser);
-        switch (curr.type)
-        {
-        case TOKEN_LESS:
-            {
-                token_t t = consume(parser, TOKEN_WORD);
-                std_args.in_file = tokentostr(&t);
-            }
-            break;
-        case TOKEN_GREAT:
-        {
-            token_t t = consume(parser, TOKEN_WORD);
-            std_args.out_file = tokentostr(&t);
-        }
-        break;
-
-        case TOKEN_2_GREAT:
-        {
-            token_t t = consume(parser, TOKEN_WORD);
-            std_args.err_file = tokentostr(&t);
-        }
-        break;
-
-        case TOKEN_PIPE:
-        {
-            parser_advance(parser);
-            marshall_simple_command(&sc, &std_args);
-            break;
-        }
-
-        case TOKEN_WORD:
-        {
-            char *str_arg = tokentostr(&curr);
-            insert_argument(&sc, str_arg);
-            break;
-        }
-        
-        default:
-            break;
-        }
-
-
-        simple_command_free(&sc);
+void *parser_args(parser_t *parser, simple_command_t *sc){
+    token_type_t tts[] = {TOKEN_PIPE};
+    while(!parser_match(parser, tts, 1)){
+        token_t tok = consume(parser, TOKEN_WORD);
+        insert_argument(sc, tokentostr(&tok));
+        parser_advance(parser);
     }
+}
+
+simple_command_t parser_pipeline(parser_t *parser) {
+    simple_command_t sc;
+    simple_command_init(&sc);
+    redir_t redir;
+    redir_init(&redir);
+
+    char *cmd_name = parser_command_name(parser);
+    if (cmd_name == NULL){
+        perror("invalid command name");
+    }
+    insert_argument(&sc, cmd_name);
+
+    redir.in_file = parser_in_file(parser);
+    redir.out_file = parser_outfile(parser);
+    redir.err_file = parser_err_file(parser);
+    
+    parser_args(parser, &sc);
+    sc.redir = redir;
+
+    return sc;
+}
+
+
+void parser_program(parser_t *parser, command_t *command){
+    token_t curr = parser_peek(parser);
+    
+    while(curr.type != TOKEN_EOF){
+        simple_command_t sc = parser_pipeline(parser);
+        insert_simple_command(&command, &sc);
+    }
+    return;
+
 }
 
 void compile(const char **src, command_t *command){
     lexer_t lexer;
     parser_t parser;
     token_array_t token_array;
-    command_t command;
 
     token_array_init(&token_array);
     lexer_init(&lexer, src);
 
     lex_all(&lexer, &token_array);
     parser_init(&parser, token_array.data);
-    parser_parse(&parser, &command);
+    parser_program(&parser, command);
 
 
     clean:
