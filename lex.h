@@ -13,7 +13,7 @@ typedef enum {
 
     // TOKEN_NEWLINE,
     TOKEN_ERROR,
-    TOKEN_WORD
+    TOKEN_WORD, TOKEN_NUMBER
 } token_type_t;
 
 

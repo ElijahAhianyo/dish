@@ -1,5 +1,26 @@
 #include "compiler.h"
 #include "lex.h"
+#include <stdarg.h>
+#include <string.h>
+
+
+char *help_msg = "Help Dish" \
+    "./dish command [options]";
+
+void parser_set_error(parser_t *parser, size_t token_index, const char *fmt, ...){
+    va_list ap;
+    va_start(ap, fmt);
+
+    char buf[256];
+    vsnprint(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+
+    // make sure err->msg attr is always freed before we allocate to it.
+    free(parser->err.msg);
+    parser->err.msg = strdup(buf);
+    parser->err.has_error = true;
+    parser->err.token_index = token_index;
+}
 
 static bool is_at_end(parser_t *parser){
     return (parser_peek(parser).type == TOKEN_EOF);
@@ -20,19 +41,20 @@ static token_t parser_advance(parser_t *parser){
     return token;
 } 
 
-static token_t consume(parser_t *parser, token_type_t tt){
+static bool consume(parser_t *parser, token_type_t tt, token_t *out_token){
     if(parser_peek(parser).type == tt){
-        parser_advance(parser);
-        return parser_peek(parser);
+        *out_token = parser_advance(parser);
+        return true;
     }
-    //TODO: need to deal with the return type here
+    return false;
 }
 
 
-bool parser_match(parser_t *parser, token_type_t *tts, size_t len){
+bool parser_match(parser_t *parser, token_type_t *tts, size_t len, bool consume_on_match){
     token_t curr = parser_peek(parser);
-    for(int i; i < len; i++){
+    for(int i=0; i < len; i++){
         if (tts[i] == curr.type){
+            if (consume_on_match) parser_advance(parser);
             return true;
         } 
     }
@@ -50,93 +72,137 @@ void parser_free(parser_t *parser){
 }
 
 
-char *parser_command_name(parser_t *parser){
+bool parser_command_name(parser_t *parser, char *name){
     token_type_t tts[] = {TOKEN_WORD};
     
-    if (parser_match(parser, tts, 1)){
-        //TODO: proper error handling here and other areas.
-        token_t tok = consume(parser, TOKEN_WORD);
+    if (parser_match(parser, tts, 1, false)){
+        token_t tok;
+        if(!consume(parser, TOKEN_WORD, &tok)){
+            token_t curr = parser_peek(parser);
+            goto set_error;
+        }
 
-        return tokentostr(&tok);
+        name = tokentostr(&tok);
+        return true;
     }
-    return NULL;
+
+    set_error:
+        parser_set_error(parser, 0, help_msg);
+        return false;
 };
-char *parser_in_file(parser_t *parser){
+bool parser_in_file(parser_t *parser, char *infile){
     token_type_t tts[] = {TOKEN_LESS};
 
-    if (parser_match(parser, tts, 1)){
-        parser_advance(parser);
-        token_t tok = consume(parser, TOKEN_WORD);
-        return tokentostr(&tok);
+    if (parser_match(parser, tts, 1, true)){
+        token_t tok;
+        if(!consume(parser, TOKEN_WORD, &tok)){
+            token_t curr = parser_peek(parser);
+            goto set_error;
+        }
+        infile = tokentostr(&tok);
+        return true;
     }
-    return NULL;
+
+    set_error:
+        parser_set_error(parser, 0, help_msg);
+        return false;
 };
 
-char *parser_outfile(parser_t *parser) {
+bool parser_outfile(parser_t *parser, char *outfile) {
     token_type_t tts[] = {TOKEN_GREAT};
 
-    if (parser_match(parser, tts, 1)){
-        parser_advance(parser);
-        token_t tok = consume(parser, TOKEN_WORD);
-        return tokentostr(&tok);
+    if (parser_match(parser, tts, 1, true)){
+        token_t tok;
+        if(!consume(parser, TOKEN_WORD, &tok)){
+            token_t curr = parser_peek(parser);
+            goto set_error;
+        }
+        outfile = tokentostr(&tok);
+        return true;
     }
-    return NULL;
+    
+    set_error:
+        parser_set_error(parser, 0, help_msg);
+        return false;
 };
-char *parser_err_file(parser_t *parser){
+
+bool parser_err_file(parser_t *parser, char *err_file){
     token_type_t tts[] = {TOKEN_2_GREAT};
 
-    if (parser_match(parser, tts, 1)){
-        parser_advance(parser);
-        token_t tok = consume(parser, TOKEN_WORD);
-        return tokentostr(&tok);
+    if (parser_match(parser, tts, 1, true)){
+        token_t tok;
+        if(!consume(parser, TOKEN_WORD, &tok)){
+            token_t curr = parser_peek(parser);
+            goto set_error;
+        }
+        err_file = tokentostr(&tok);
+        return true;
     }
-    return NULL;
+    
+    set_error:
+        parser_set_error(parser, 0, help_msg);
+        return false;
 }
 
-void *parser_args(parser_t *parser, simple_command_t *sc){
-    token_type_t tts[] = {TOKEN_PIPE};
-    while(!parser_match(parser, tts, 1)){
-        token_t tok = consume(parser, TOKEN_WORD);
+bool *parser_args(parser_t *parser, simple_command_t *sc){
+    token_type_t tts[] = {TOKEN_PIPE, TOKEN_AMPERSAND, TOKEN_EOF};
+    while(!parser_match(parser, tts, 1, true)){
+        token_t tok;
+        if(consume(parser, TOKEN_WORD, &tok)){
+            token_t curr = parser_peek(parser);
+            goto set_error;
+        }
         insert_argument(sc, tokentostr(&tok));
-        parser_advance(parser);
+        return true;
     }
+
+    set_error:
+        parser_set_error(parser, 0, help_msg);
+        return false;
 }
 
-simple_command_t parser_pipeline(parser_t *parser) {
-    simple_command_t sc;
-    simple_command_init(&sc);
+bool parser_pipeline(parser_t *parser, simple_command_t *sc) {
+    
     redir_t redir;
     redir_init(&redir);
 
-    char *cmd_name = parser_command_name(parser);
-    if (cmd_name == NULL){
-        perror("invalid command name");
-    }
+    char *cmd_name;
+    if (!parser_command_name(parser, cmd_name)) return false;
     insert_argument(&sc, cmd_name);
 
-    redir.in_file = parser_in_file(parser);
-    redir.out_file = parser_outfile(parser);
-    redir.err_file = parser_err_file(parser);
+    if(!parser_in_file(parser, redir.in_file)) return false;
+    if(!parser_outfile(parser, redir.out_file)) return false;
+    if(!parser_err_file(parser, redir.err_file)) return false;
     
-    parser_args(parser, &sc);
-    sc.redir = redir;
+    if(!parser_args(parser, &sc)) return false;
+    sc->redir = redir;
 
     return sc;
 }
 
 
-void parser_program(parser_t *parser, command_t *command){
-    token_t curr = parser_peek(parser);
-    
-    while(curr.type != TOKEN_EOF){
-        simple_command_t sc = parser_pipeline(parser);
+bool parser_program(parser_t *parser, command_t *command){
+    token_type_t tts [] = {TOKEN_EOF, TOKEN_AMPERSAND};
+
+    while(!parser_match(parser, tts, 2, true)){
+        simple_command_t sc;
+        simple_command_init(&sc);
+
+        if (!parser_pipeline(parser, &sc)) return false;
         insert_simple_command(&command, &sc);
+    }
+
+    // try to set the background flag if set.
+    token_type_t tts[] = {TOKEN_AMPERSAND};
+    if (parser_match(parser,tts, 1, true)){
+        command->background = true;
+        parser_advance(parser);
     }
     return;
 
 }
 
-void compile(const char **src, command_t *command){
+bool compile(const char *src, command_t *command){
     lexer_t lexer;
     parser_t parser;
     token_array_t token_array;
@@ -146,12 +212,16 @@ void compile(const char **src, command_t *command){
 
     lex_all(&lexer, &token_array);
     parser_init(&parser, token_array.data);
-    parser_program(&parser, command);
-
 
     clean:
         token_array_free(&token_array);
-        parser_free(&parser);
         lexer_free(&lexer);
-        
+    
+    if(!parser_program(&parser, command)){
+        printf("%s", parser.err.msg);
+        parser_free(&parser);
+        return false;
+    }
+    parser_free(&parser);
+    return true;
 }
