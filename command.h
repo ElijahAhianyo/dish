@@ -24,7 +24,7 @@ void simple_command_free(simple_command_t *simple_command);
 typedef struct {
     size_t capacity;
     size_t pipeline_len;
-    simple_command_t **pipeline;
+    simple_command_t *pipeline;
     int background;
 } command_t;
 
@@ -32,4 +32,4 @@ typedef struct {
 void command_init(command_t *command);
 void command_free(command_t *command);
 
-void insert_simple_command(command_t *command, simple_command_t *simple_command); //TODO: Does simple_command really have to be a ref here?
+void insert_simple_command(command_t *command, simple_command_t simple_command); //TODO: Does simple_command really have to be a ref here?

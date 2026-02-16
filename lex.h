@@ -23,6 +23,7 @@ typedef struct {
     int len;
 } token_t;
 
+void token_free(token_t *token);
 
 typedef struct {
     const char *start;

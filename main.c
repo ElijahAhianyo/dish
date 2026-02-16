@@ -4,7 +4,7 @@
 #include "executer.h"
 
 
-static void replit(void) {
+static void repl(void) {
     char line[1024];
     lexer_t lexer;
     
@@ -18,19 +18,20 @@ static void replit(void) {
             printf("\n");
             break;
         }
-        compile(line, &command);
-        execute(&command);
-        printf("we are done!\n");
-        clean:
-            free(line);
+        if(!compile(line, &command)){
             command_free(&command);
+            continue;
+        }
+        execute(&command);
+        // printf("we are done!\n");
+        command_free(&command);
     }
 }
 
 int main(void){
-    // for now go into the replit directly.
+    // for now go into the repl directly.
 
-    replit();
+    repl();
 
     return 0;
 }
