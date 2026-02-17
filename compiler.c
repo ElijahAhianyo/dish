@@ -99,7 +99,7 @@ bool parser_command_name(parser_t *parser, char *name){
         return false;
 }
 
-bool parser_in_file(parser_t *parser, char *infile){
+bool parser_in_file(parser_t *parser, char **infile){
     token_type_t tts[] = {TOKEN_LT};
 
     if (parser_match(parser, tts, 1, true)){
@@ -107,7 +107,7 @@ bool parser_in_file(parser_t *parser, char *infile){
         if(!consume(parser, TOKEN_WORD, &tok)){
             goto set_error;
         }
-        infile = tokentostr(&tok);
+        *infile = tokentostr(&tok);
         return true;
     }
 
@@ -116,7 +116,7 @@ bool parser_in_file(parser_t *parser, char *infile){
         return false;
 }
 
-bool parser_outfile(parser_t *parser, char *outfile) {
+bool parser_outfile(parser_t *parser, char **outfile) {
     token_type_t tts[] = {TOKEN_GT};
 
     if (parser_match(parser, tts, 1, true)){
@@ -124,7 +124,7 @@ bool parser_outfile(parser_t *parser, char *outfile) {
         if(!consume(parser, TOKEN_WORD, &tok)){
             goto set_error;
         }
-        outfile = tokentostr(&tok);
+        *outfile = tokentostr(&tok);
         return true;
     }
     
@@ -133,7 +133,7 @@ bool parser_outfile(parser_t *parser, char *outfile) {
         return false;
 }
 
-bool parser_err_file(parser_t *parser, char *err_file){
+bool parser_err_file(parser_t *parser, char **err_file){
     token_type_t tts[] = {TOKEN_2_GT};
 
     if (parser_match(parser, tts, 1, true)){
@@ -141,7 +141,7 @@ bool parser_err_file(parser_t *parser, char *err_file){
         if(!consume(parser, TOKEN_WORD, &tok)){
             goto set_error;
         }
-        err_file = tokentostr(&tok);
+        *err_file = tokentostr(&tok);
         return true;
     }
     
@@ -165,20 +165,23 @@ bool parser_args(parser_t *parser, simple_command_t *sc){
         parser_set_error(parser, 0, help_msg);
         return false;
 }
-
+/*
+* Extract individual commands (before the pipe) along with their redir
+* files if present. Return true if successful and false if any error occured.
+*/
 bool parser_pipeline(parser_t *parser, simple_command_t *sc) {
 
     char *cmd_name = NULL;
     if (!parser_command_name(parser, cmd_name)) return false;
     insert_argument(sc, cmd_name);
 
-    if(!parser_in_file(parser, sc->redir.in_file)) return false;
-    if(!parser_outfile(parser, sc->redir.out_file)) return false;
-    if(!parser_err_file(parser, sc->redir.err_file)) return false;
+    if(!parser_in_file(parser, &sc->redir.in_file)) return false;
+    if(!parser_outfile(parser, &sc->redir.out_file)) return false;
+    if(!parser_err_file(parser, &sc->redir.err_file)) return false;
     
     if(!parser_args(parser, sc)) return false;
 
-    return sc;
+    return true;
 }
 
 
@@ -203,6 +206,19 @@ bool parser_program(parser_t *parser, command_t *command){
 
 }
 
+void print_command(command_t *command){
+    for(int i=0; i < command->pipeline_len; i++){
+        simple_command_t sc = command->pipeline[i];
+        
+        for(int j=0; j< sc.argc; j++){
+            char *arg = sc.argv[j];
+            printf("%s ", arg);
+        }
+        printf(" | ");
+    }
+    printf("\n");
+}
+
 /*
 * run lexer and parse tokens into commands. command will be 
 * freed if program fails to compile(i.e if parser_program returns false).
@@ -222,6 +238,8 @@ bool compile(const char *src, command_t *command){
         printf("%s", parser.err.msg);
         goto cleanup;
     }
+
+    print_command(command);
 
     token_array_free(&token_array);
     lexer_free(&lexer);

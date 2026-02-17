@@ -30,8 +30,8 @@ void token_free(token_t *token);
 
 typedef struct {
     char *buf;
-    const char *start;
-    const char *current;
+    char *start;
+    char *current;
 } lexer_t;
 
 typedef struct {

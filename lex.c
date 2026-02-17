@@ -37,7 +37,7 @@ static char peek_next(lexer_t *lexer){
 }
 
 void lexer_init(lexer_t *lexer, const char *src){
-    lexer->buf = src;
+    lexer->buf = strdup(src);
     lexer->start = lexer->buf;
     lexer->current = lexer->buf;
 }

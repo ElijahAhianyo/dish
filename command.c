@@ -60,7 +60,7 @@ void insert_argument(simple_command_t *simple_command, char *arg){
         // increase array size if we're at the boundary
         int old_capacity = simple_command->capacity;
         simple_command->capacity = GROW_CAPACITY(old_capacity);
-        simple_command->argv = GROW_ARRAY(char, simple_command->argv, old_capacity, simple_command->capacity);
+        simple_command->argv = GROW_ARRAY(char*, simple_command->argv, old_capacity, simple_command->capacity);
     }
     simple_command->argv[simple_command->argc] = arg;
     simple_command->argc++;
