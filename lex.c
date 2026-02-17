@@ -7,12 +7,17 @@ bool is_at_end(lexer_t *lexer){
     return *lexer->current == '\0';
 }
 
-
+/*
+* create a token from the lexer details. The lexer->start is
+* zero-copied (we only store a pointer) so it must not be freed
+* since we rely on the parser to strdup it
+*/
 token_t make_token(lexer_t *lexer, token_type_t token_type){
     token_t token;
+    size_t len = (size_t)(lexer->current - lexer->start);
     token.start = lexer->start;
     token.type = token_type;
-    token.len = (int)(lexer->current - lexer->start);
+    token.len = len;
     return token;
 }
 
@@ -31,10 +36,19 @@ static char peek_next(lexer_t *lexer){
     return lexer->current[1];
 }
 
-void lexer_init(lexer_t *lexer, char *src){
-    lexer->start = src;
-    lexer->current = src;
+void lexer_init(lexer_t *lexer, const char *src){
+    lexer->buf = src;
+    lexer->start = lexer->buf;
+    lexer->current = lexer->buf;
 }
+
+
+void lexer_free(lexer_t *lexer){
+    if (!lexer) return;
+    free(lexer->buf);
+    lexer_init(lexer, NULL);
+}
+
 
 static bool is_alpha(char c){
     return (
@@ -71,7 +85,12 @@ static token_t command(lexer_t *lexer){
 }
 
 void lex_all(lexer_t *lexer, token_array_t *token_array){
-
+    while(!is_at_end(lexer)){
+        token_t tok = scan_token(lexer);
+        token_array_push(token_array, tok);
+    }
+    token_t eof = make_token(lexer, TOKEN_EOF);
+    token_array_push(token_array, eof);
 }
 
 token_t scan_token(lexer_t *lexer){
@@ -110,10 +129,20 @@ void token_array_push(token_array_t *token_array, token_t token){
 }
 
 void token_array_free(token_array_t *token_array){
-
+    for(int i = 0; i < (int)token_array->len; i++){
+        token_free(&token_array->data[i]);
+    }
+    free(token_array->data);
+    token_array_init(token_array);
 }
 
 char *tokentostr(token_t *t){
     char *dup = strndup(t->start, t->len);
     return dup;
+}
+
+void token_free(token_t *token){
+    token->start = NULL;
+    token->len = 0;
+    token->type = TOKEN_ERROR;
 }

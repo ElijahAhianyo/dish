@@ -1,3 +1,6 @@
+#ifndef dish_command_h
+#define dish_command_h
+
 #include "common.h"
 
 typedef struct {
@@ -32,4 +35,6 @@ typedef struct {
 void command_init(command_t *command);
 void command_free(command_t *command);
 
-void insert_simple_command(command_t *command, simple_command_t simple_command); //TODO: Does simple_command really have to be a ref here?
+void insert_simple_command(command_t *command, simple_command_t *simple_command);
+
+#endif

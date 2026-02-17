@@ -1,10 +1,13 @@
+#ifndef dish_lex_h
+#define dish_lex_h
+
 #include "common.h"
 
 typedef enum {
     TOKEN_EOF, 
-    TOKEN_PIPE, TOKEN_REDIRECT_IN, TOKEN_REDIRECT_OUT, TOKEN_MINUS,
-    TOKEN_STAR, TOKEN_SLASH, TOKEN_LESS, TOKEN_LESS_LESS, TOKEN_GREAT, TOKEN_GREAT_GREAT,
-    TOKEN_GREATAMPERSAND, TOKEN_AMPERSAND, TOKEN_2_GREAT,
+    TOKEN_PIPE, TOKEN_MINUS,
+    TOKEN_STAR, TOKEN_SLASH, TOKEN_LT, TOKEN_LT_LT, TOKEN_GT, TOKEN_GT_GT,
+    TOKEN_GT_AMP, TOKEN_AMP, TOKEN_2_GT,
 
     // commands
     TOKEN_COMMAND_LS,TOKEN_COMMAND_EXIT,TOKEN_COMMAND_HELP, 
@@ -20,12 +23,13 @@ typedef enum {
 typedef struct {
     token_type_t type;
     const char *start;
-    int len;
+    size_t len;
 } token_t;
 
 void token_free(token_t *token);
 
 typedef struct {
+    char *buf;
     const char *start;
     const char *current;
 } lexer_t;
@@ -36,7 +40,7 @@ typedef struct {
     size_t cap;
 } token_array_t;
 
-void lexer_init(lexer_t *lexer, char *src);
+void lexer_init(lexer_t *lexer, const char *src);
 void lexer_free(lexer_t *lexer);
 
 void token_array_init(token_array_t *token_array);
@@ -48,3 +52,4 @@ void lex_all(lexer_t *lexer, token_array_t *token_array);
 
 char *tokentostr(token_t *t);
 
+#endif

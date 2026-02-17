@@ -25,7 +25,7 @@ void simple_command_init(simple_command_t *simple_command){
 void simple_command_free(simple_command_t *simple_command){
     
     if(!simple_command) return;
-    for(int i = 0; i < simple_command->argc; i++){
+    for(int i = 0; i < (int)simple_command->argc; i++){
         free(simple_command->argv[i]);
     }
     free(simple_command->argv);
@@ -44,7 +44,7 @@ void command_init(command_t *command) {
 void command_free(command_t *command){
     if (!command) return;
 
-    for(int i = 0; i < command->pipeline_len; i++){
+    for(int i = 0; i < (int)command->pipeline_len; i++){
         simple_command_free(&command->pipeline[i]);
     }
     free(command->pipeline);

@@ -24,6 +24,6 @@ void parser_free(parser_t *parser);
 
 void parser_set_error(parser_t *p, size_t token_index, const char *fmt, ...);
 
-bool compile(const char **src, command_t *command);
+bool compile(const char *src, command_t *command);
 
 #endif
