@@ -21,6 +21,12 @@ void parser_set_error(parser_t *parser, size_t token_index, const char *fmt, ...
     parser->err.token_index = token_index;
 }
 
+void parser_error_init(parser_error_t *err){
+    err->has_error = false;
+    err->msg = NULL;
+    err->token_index = 0;
+}
+
 static token_t parser_peek(parser_t *parser){
     return parser->tokens[parser->current];
 }
@@ -65,6 +71,7 @@ void parser_init(parser_t *parser, token_t *tokens, size_t token_len){
     parser->start = 0;
     parser->tokens = tokens;
     parser->token_len = token_len;
+    parser_error_init(&parser->err);
 }
 
 void parser_free(parser_t *parser){
@@ -184,16 +191,15 @@ bool parser_err_file(parser_t *parser, char **err_file){
 
 bool parser_args(parser_t *parser, simple_command_t *sc){
     token_type_t tts[] = {TOKEN_PIPE, TOKEN_AMP, TOKEN_EOF};
-    while(!parser_match(parser, tts, 1, true)){
+    while(!parser_match(parser, tts, 3, true)){
         token_t tok;
         if(!consume(parser, TOKEN_WORD, &tok)){
             goto set_error;
         }
         insert_argument(sc, tokentostr(&tok));
-        return true;
     }
 
-    return false;
+    return true;
 
     set_error:
         token_t curr = parser_peek(parser);
