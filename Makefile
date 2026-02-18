@@ -3,3 +3,5 @@ dish:
 
 clean:
 	rm -rf dish
+
+all: clean dish

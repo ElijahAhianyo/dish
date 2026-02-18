@@ -15,11 +15,10 @@ void redir_free(redir_t *redir){
 }
 
 void simple_command_init(simple_command_t *simple_command){
-    redir_t redir;
     simple_command->capacity = 0;
     simple_command->argc = 0;
     simple_command->argv = NULL;
-    redir_init(&redir);
+    redir_init(&simple_command->redir);
 }
 
 void simple_command_free(simple_command_t *simple_command){

@@ -16,8 +16,6 @@ void parser_set_error(parser_t *parser, size_t token_index, const char *fmt, ...
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    // make sure err->msg attr is always freed before we allocate to it.
-    free(parser->err.msg);
     parser->err.msg = strdup(buf);
     parser->err.has_error = true;
     parser->err.token_index = token_index;
@@ -79,8 +77,12 @@ void parser_free(parser_t *parser){
     parser_init(parser, NULL, 0);
 }
 
-
-bool parser_command_name(parser_t *parser, char *name){
+/*
+* Parse the command name of command and return true. Return false 
+* if otherwise. When an error occurs, return false and set parser->err.has_error
+* to true. 
+*/
+bool parser_command_name(parser_t *parser, char **name){
     token_type_t tts[] = {TOKEN_WORD};
     
     if (parser_match(parser, tts, 1, false)){
@@ -90,15 +92,24 @@ bool parser_command_name(parser_t *parser, char *name){
             goto set_error;
         }
 
-        name = tokentostr(&tok);
+        *name = tokentostr(&tok);
         return true;
     }
 
+    return false;
+
     set_error:
+        token_t curr = parser_peek(parser);
+        printf("error at parser_command_name: %s \n", tokentostr(&curr));
         parser_set_error(parser, 0, help_msg);
         return false;
 }
 
+/*
+* Parse the redirect in file and return true if found else false if 
+* otherwise. When an error occurs it returns false and also sets 
+* parser->err.has_error to true. 
+*/
 bool parser_in_file(parser_t *parser, char **infile){
     token_type_t tts[] = {TOKEN_LT};
 
@@ -111,11 +122,20 @@ bool parser_in_file(parser_t *parser, char **infile){
         return true;
     }
 
+    return false;
+
     set_error:
+        token_t curr = parser_peek(parser);
+        printf("error at parser_in_file: %s \n", tokentostr(&curr));
         parser_set_error(parser, 0, help_msg);
         return false;
 }
 
+/*
+* Parse the redirect out file and return true if found else false if 
+* otherwise. When an error occurs it returns false and also sets 
+* parser->err.has_error to true. 
+*/
 bool parser_outfile(parser_t *parser, char **outfile) {
     token_type_t tts[] = {TOKEN_GT};
 
@@ -127,12 +147,21 @@ bool parser_outfile(parser_t *parser, char **outfile) {
         *outfile = tokentostr(&tok);
         return true;
     }
+    return false;
     
     set_error:
+        token_t curr = parser_peek(parser);
+        printf("error at parser_out_file: %s \n", tokentostr(&curr));
         parser_set_error(parser, 0, help_msg);
         return false;
 }
 
+
+/*
+* Parse the redirect error file and return true if found else false if 
+* otherwise. When an error occurs it returns false and also sets 
+* parser->err.has_error to true. 
+*/
 bool parser_err_file(parser_t *parser, char **err_file){
     token_type_t tts[] = {TOKEN_2_GT};
 
@@ -144,8 +173,11 @@ bool parser_err_file(parser_t *parser, char **err_file){
         *err_file = tokentostr(&tok);
         return true;
     }
+    return false;
     
     set_error:
+        token_t curr = parser_peek(parser);
+        printf("error at parser_out_file: %s\n", tokentostr(&curr));
         parser_set_error(parser, 0, help_msg);
         return false;
 }
@@ -154,14 +186,18 @@ bool parser_args(parser_t *parser, simple_command_t *sc){
     token_type_t tts[] = {TOKEN_PIPE, TOKEN_AMP, TOKEN_EOF};
     while(!parser_match(parser, tts, 1, true)){
         token_t tok;
-        if(consume(parser, TOKEN_WORD, &tok)){
+        if(!consume(parser, TOKEN_WORD, &tok)){
             goto set_error;
         }
         insert_argument(sc, tokentostr(&tok));
         return true;
     }
 
+    return false;
+
     set_error:
+        token_t curr = parser_peek(parser);
+        printf("error at parser_args: %s\n", tokentostr(&curr));
         parser_set_error(parser, 0, help_msg);
         return false;
 }
@@ -172,14 +208,14 @@ bool parser_args(parser_t *parser, simple_command_t *sc){
 bool parser_pipeline(parser_t *parser, simple_command_t *sc) {
 
     char *cmd_name = NULL;
-    if (!parser_command_name(parser, cmd_name)) return false;
+    if (!parser_command_name(parser, &cmd_name)) return false;
     insert_argument(sc, cmd_name);
 
-    if(!parser_in_file(parser, &sc->redir.in_file)) return false;
-    if(!parser_outfile(parser, &sc->redir.out_file)) return false;
-    if(!parser_err_file(parser, &sc->redir.err_file)) return false;
+    if(!parser_in_file(parser, &sc->redir.in_file) && parser->err.has_error) return false;
+    if(!parser_outfile(parser, &sc->redir.out_file) && parser->err.has_error) return false;
+    if(!parser_err_file(parser, &sc->redir.err_file) && parser->err.has_error) return false;
     
-    if(!parser_args(parser, sc)) return false;
+    if(!parser_args(parser, sc) && parser->err.has_error) return false;
 
     return true;
 }
@@ -207,10 +243,10 @@ bool parser_program(parser_t *parser, command_t *command){
 }
 
 void print_command(command_t *command){
-    for(int i=0; i < command->pipeline_len; i++){
+    for(int i=0; i < (int)command->pipeline_len; i++){
         simple_command_t sc = command->pipeline[i];
         
-        for(int j=0; j< sc.argc; j++){
+        for(int j=0; j< (int)sc.argc; j++){
             char *arg = sc.argv[j];
             printf("%s ", arg);
         }
@@ -235,7 +271,7 @@ bool compile(const char *src, command_t *command){
     parser_init(&parser, token_array.data, token_array.len);
     
     if(!parser_program(&parser, command)){
-        printf("%s", parser.err.msg);
+        printf("%s\n", parser.err.msg);
         goto cleanup;
     }
 
@@ -253,3 +289,5 @@ bool compile(const char *src, command_t *command){
         lexer_free(&lexer);
         return false;
 }
+
+// cat < in.txt | echo "hey there"

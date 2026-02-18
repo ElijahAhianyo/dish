@@ -37,7 +37,8 @@ static char peek_next(lexer_t *lexer){
 }
 
 void lexer_init(lexer_t *lexer, const char *src){
-    lexer->buf = strdup(src);
+    
+    lexer->buf = (src) ? strdup(src) : NULL;
     lexer->start = lexer->buf;
     lexer->current = lexer->buf;
 }
@@ -53,7 +54,8 @@ void lexer_free(lexer_t *lexer){
 static bool is_alpha(char c){
     return (
         (c >= 'a' && c <= 'z' )||
-        (c >= 'A' && c <= 'Z')
+        (c >= 'A' && c <= 'Z') ||
+        (c == '.' || c == '_')
     );
 }
 
@@ -87,10 +89,30 @@ static token_t command(lexer_t *lexer){
 void lex_all(lexer_t *lexer, token_array_t *token_array){
     while(!is_at_end(lexer)){
         token_t tok = scan_token(lexer);
-        token_array_push(token_array, tok);
+        if (lexer->current){
+            // the conditional check here might not be neccessary and we should 
+            // remove this if we handle unknown/invalid tokens or symbols in scan_token
+            token_array_push(token_array, tok);
+        }
     }
     token_t eof = make_token(lexer, TOKEN_EOF);
     token_array_push(token_array, eof);
+}
+
+void skip_whitespace(lexer_t *lexer){
+    for(;;){
+        char c = peek(lexer);
+
+        switch(c){
+            case ' ':  
+            case '\t':
+            case '\n':
+                advance(lexer);
+                break;
+            default:
+                return;
+        }
+    }
 }
 
 token_t scan_token(lexer_t *lexer){
@@ -98,15 +120,32 @@ token_t scan_token(lexer_t *lexer){
 
     if (is_at_end(lexer)) return maketok(TOKEN_EOF);
 
+    skip_whitespace(lexer);
+    lexer->start = lexer->current;
+
     char c = advance(lexer);
 
     if(is_alpha(c)) return command(lexer); 
 
     switch (c){
         case '|': return maketok(TOKEN_PIPE);
-        case '-': return maketok(TOKEN_MINUS);
-        // case ''
+        case '-': {
+            return ( (peek_next(lexer) == '-') ? (make_token(lexer, TOKEN_MINUS_MINUS)) : make_token(lexer, TOKEN_MINUS));
+        }
+        case '<': {
+            return ( (peek_next(lexer) == '<') ? (make_token(lexer, TOKEN_LT_LT)) : make_token(lexer, TOKEN_LT));
+        }
+        case '>': {
+            return ( (peek_next(lexer) == '>') ? (make_token(lexer, TOKEN_GT_GT)) : make_token(lexer, TOKEN_GT));
+        }
+        case '&': {
+            return ( (peek_next(lexer) == '&') ? (make_token(lexer, TOKEN_AMP_AMP)) : make_token(lexer, TOKEN_AMP));
+        }
+        case '2': {
+            if(peek_next(lexer) == '>') return maketok(TOKEN_2_GT);
+        }
     };
+    // TODO: we should handle unknown symbols properly rather than treating them as TOKEN_WORD.
     return maketok(TOKEN_WORD);
     #undef maketok
 }
