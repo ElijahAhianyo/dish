@@ -27,6 +27,11 @@ void parser_error_init(parser_error_t *err){
     err->token_index = 0;
 }
 
+void parser_error_free(parser_error_t *err){
+    free(err->msg);
+    parser_error_init(err);
+}
+
 static token_t parser_peek(parser_t *parser){
     return parser->tokens[parser->current];
 }
@@ -81,6 +86,7 @@ void parser_free(parser_t *parser){
         token_free(&parser->tokens[0]);
     }
     free(parser->tokens);
+    parser_error_free(&parser->err);
     parser_init(parser, NULL, 0);
 }
 
@@ -95,7 +101,6 @@ bool parser_command_name(parser_t *parser, char **name){
     if (parser_match(parser, tts, 1, false)){
         token_t tok;
         if(!consume(parser, TOKEN_WORD, &tok)){
-            // token_t curr = parser_peek(parser);
             goto set_error;
         }
 
@@ -295,5 +300,3 @@ bool compile(const char *src, command_t *command){
         lexer_free(&lexer);
         return false;
 }
-
-// cat < in.txt | echo "hey there"
